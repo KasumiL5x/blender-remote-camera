@@ -1,12 +1,14 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '' # https://stackoverflow.com/a/54247065
-
+import socket
 import pygame
 
 class Controller(object):
 	axis_map = {}
 	button_map = {}
 	dpad_map = {}
+	sock = None
+	deadzone = 0.2
 
 	def setup(self) -> bool:
 		pygame.init()
@@ -28,8 +30,19 @@ class Controller(object):
 			self.dpad_map[i] = (0, 0)
 
 		return True
+	#end
 
-	def poll(self):
+	def connect(self):
+		# Create the socket.
+		try:
+			self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		except socket.error as msg:
+			print(f'Failed to create socket. Error code: {msg[0]}; Message: {msg[1]}')
+			return False
+		return True
+	#end
+
+	def poll(self, host, port):
 		while True:
 			for evt in pygame.event.get():
 				if pygame.JOYAXISMOTION == evt.type:
@@ -48,18 +61,58 @@ class Controller(object):
 				rstick_y = self.axis_map[3]
 
 				os.system('clear')
+				print('Raw:')
 				print(f'LX: {lstick_x}')
 				print(f'LY: {lstick_y}')
 				print(f'RX: {rstick_x}')
-				print(f'RY: {rstick_y}')
+				print(f'RY: {rstick_y}\n')
 
+				print('Sending:')
+				# Send left stick X.
+				if self.stick_past_deadzone(lstick_x):
+					lstick_x_str = f'LSX:{lstick_x}'
+					print(lstick_x_str)
+					#
+					lstick_x_bytes = bytes(lstick_x_str, 'utf-8')
+					self.send_data(lstick_x_bytes, host, port)
 
-				# os.system('clear')
-				# print(f'Buttons: {self.button_map}')
-				# print(f'Axes: {self.axis_map}')
-				# print(f'Dpad: {self.dpad_map}')
+				# Send left stick Y.
+				if self.stick_past_deadzone(lstick_y):
+					lstick_y_str = f'LSY:{lstick_y}'
+					print(lstick_y_str)
+					#
+					lstick_y_bytes = bytes(lstick_y_str, 'utf-8')
+					self.send_data(lstick_y_bytes, host, port)
+
+				# Send right stick X.
+				if self.stick_past_deadzone(rstick_x):
+					rstick_x_str = f'RSX:{rstick_x}'
+					print(rstick_x_str)
+					#
+					rstick_x_bytes = bytes(rstick_x_str, 'utf-8')
+					self.send_data(rstick_x_bytes, host, port)
+
+				# Send right stick Y.
+				if self.stick_past_deadzone(rstick_y):
+					rstick_y_str = f'RSY:{rstick_y}'
+					print(rstick_y_str)
+					#
+					rstick_y_bytes = bytes(rstick_y_str, 'utf-8')
+					self.send_data(rstick_y_bytes, host, port)
+		#end
+	#end
+
+	def stick_past_deadzone(self, stick_value):
+		return stick_value > self.deadzone or stick_value < -self.deadzone
+
+	def send_data(self, msg_bytes, host, port):
+		try:
+			self.sock.sendto(msg_bytes, (host, port))
+		except socket.error as msg:
+			print(f'Failed to send data. Error code: {msg[0]}; Message: {msg[1]}')
+	#end
 
 if __name__ == '__main__':
 	controller = Controller()
-	if controller.setup():
-		controller.poll()
+	if controller.setup() and controller.connect():
+		controller.poll('localhost', 4242)
