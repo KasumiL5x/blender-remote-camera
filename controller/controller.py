@@ -18,6 +18,9 @@ class Controller(object):
 		controller = pygame.joystick.Joystick(0)
 		controller.init()
 
+		for i in range(controller.get_numaxes()):
+			self.axis_map[i] = 0.0
+
 		for i in range(controller.get_numbuttons()):
 			self.button_map[i] = False
 
@@ -38,10 +41,23 @@ class Controller(object):
 				elif pygame.JOYHATMOTION == evt.type:
 					self.dpad_map[evt.hat] = evt.value
 
+				# DS4-specific mappings.
+				lstick_x = self.axis_map[0]
+				lstick_y = self.axis_map[1]
+				rstick_x = self.axis_map[2]
+				rstick_y = self.axis_map[3]
+
 				os.system('clear')
-				print(f'Buttons: {self.button_map}')
-				print(f'Axes: {self.axis_map}')
-				print(f'Dpad: {self.dpad_map}')
+				print(f'LX: {lstick_x}')
+				print(f'LY: {lstick_y}')
+				print(f'RX: {rstick_x}')
+				print(f'RY: {rstick_y}')
+
+
+				# os.system('clear')
+				# print(f'Buttons: {self.button_map}')
+				# print(f'Axes: {self.axis_map}')
+				# print(f'Dpad: {self.dpad_map}')
 
 if __name__ == '__main__':
 	controller = Controller()
