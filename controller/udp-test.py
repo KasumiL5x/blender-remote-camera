@@ -33,6 +33,48 @@ while True:
 	if not data:
 		break
 
-	print(f'Received data from {addr}: {data}')
+	# Back from bytes to string.
+	data_str = str(data, 'utf-8')
+
+	# The expected format is "KEY:VALUE".
+	splits = data_str.split(':')
+	if len(splits) != 2:
+		break
+	key = splits[0]
+	val = splits[1]
+
+	# LSX
+	if 'LSX' == key:
+		try:
+			stick_val = float(val)
+			print(f'LSX > {stick_val}')
+		except ValueError:
+			pass
+
+	# LSY
+	if 'LSY' == key:
+		try:
+			stick_val = float(val)
+			print(f'LSY > {stick_val}')
+		except ValueError:
+			pass
+
+	# RSX
+	if 'RSX' == key:
+		try:
+			stick_val = float(val)
+			print(f'RSX > {stick_val}')
+		except ValueError:
+			pass
+
+	# RSY
+	if 'RSY' == key:
+		try:
+			stick_val = float(val)
+			print(f'RSY > {stick_val}')
+		except ValueError:
+			pass
+
+	# print(f'Received data from {addr}: {data}')
 
 s.close()
