@@ -106,7 +106,6 @@ class BRCCommand_LSX(BRCCommand):
 
   	# Verified from DEV_OT_remote_camera.poll().
   	cam = context.scene.camera
-  	# cam = context.selected_objects[0]
   	cam.location += mathutils.Vector((stick_val * context.scene.brc_move_mod, 0, 0)) @ cam.matrix_world.inverted()
 
   	return True
@@ -126,7 +125,6 @@ class BRCCommand_LSY(BRCCommand):
 
   	# Verified from DEV_OT_remote_camera.poll().
   	cam = context.scene.camera
-  	# cam = context.selected_objects[0]
   	cam.location += mathutils.Vector((0, 0, stick_val * context.scene.brc_move_mod)) @ cam.matrix_world.inverted()
 
   	return True
@@ -146,7 +144,6 @@ class BRCCommand_RSX(BRCCommand):
 
   	# Verified from DEV_OT_remote_camera.poll().
   	cam = context.scene.camera
-  	# cam = context.selected_objects[0]
 
   	LOCAL_SPACE = False
   	if LOCAL_SPACE:
@@ -173,14 +170,13 @@ class BRCCommand_RSY(BRCCommand):
 
   	# Verified from DEV_OT_remote_camera.poll().
   	cam = context.scene.camera
-  	# cam = context.selected_objects[0]
 
   	LOCAL_SPACE = True
   	if LOCAL_SPACE:
-  		new_quat = mathutils.Quaternion((1, 0, 0), stick_val * 0.1)
+  		new_quat = mathutils.Quaternion((1, 0, 0), stick_val * context.scene.brc_orient_mod)
   		cam.rotation_quaternion = cam.rotation_quaternion @ new_quat
   	else:
-  		new_quat = mathutils.Quaternion((1, 0, 0), stick_val * 0.1)
+  		new_quat = mathutils.Quaternion((1, 0, 0), stick_val * context.scene.brc_orient_mod)
   		cam.rotation_quaternion = new_quat @ cam.rotation_quaternion
 
   	return True
@@ -205,10 +201,6 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 	def poll(self, context):
 		# Scene camera.
 		return (context.scene.camera is not None) and (context.scene.camera.rotation_mode == 'QUATERNION')
-
-		# Must have a selected camera as the first object.
-		# sel = context.selected_objects
-		# return len(sel) and 'CAMERA' == sel[0].type
 	#end
 
 	# Test to print the props.
@@ -217,7 +209,7 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 		self.brc_thread = BRCSocketThread(context.scene.brc_hostname, context.scene.brc_port)
 		self.brc_thread.start()
 
-		self.brc_timer = context.window_manager.event_timer_add(0.05, window=context.window)
+		self.brc_timer = context.window_manager.event_timer_add(0.01, window=context.window)
 		context.window_manager.modal_handler_add(self)
 		return {'RUNNING_MODAL'}
 	#end
@@ -301,13 +293,13 @@ def register():
 	)
 	bpy.types.Scene.brc_move_mod = bpy.props.FloatProperty(
 		name = "brc_move_mod",
-		default = 0.1,
+		default = 0.5,
 		description = "Camera movement modifier.",
 		min = 0.0
 	)
 	bpy.types.Scene.brc_orient_mod = bpy.props.FloatProperty(
 		name = "brc_orient_mod",
-		default = 0.1,
+		default = 0.02,
 		description = "Camera orientation modifier.",
 		min = 0.0
 	)
