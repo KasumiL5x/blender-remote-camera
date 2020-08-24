@@ -11,6 +11,7 @@ bl_info = {
 }
 
 import bpy
+import mathutils
 import threading
 import socket
 from collections import deque
@@ -106,7 +107,7 @@ class BRCCommand_LSX(BRCCommand):
   	# Verified from DEV_OT_remote_camera.poll().
   	cam = context.scene.camera
   	# cam = context.selected_objects[0]
-  	cam.location.x += stick_val
+  	cam.location += mathutils.Vector((stick_val * context.scene.brc_move_mod, 0, 0)) @ cam.matrix_world.inverted()
 
   	return True
   #end
@@ -126,7 +127,7 @@ class BRCCommand_LSY(BRCCommand):
   	# Verified from DEV_OT_remote_camera.poll().
   	cam = context.scene.camera
   	# cam = context.selected_objects[0]
-  	cam.location.z += -stick_val
+  	cam.location += mathutils.Vector((0, 0, stick_val * context.scene.brc_move_mod)) @ cam.matrix_world.inverted()
 
   	return True
   #end
@@ -147,7 +148,13 @@ class BRCCommand_RSX(BRCCommand):
   	cam = context.scene.camera
   	# cam = context.selected_objects[0]
 
-  	print('TODO: Handle RSX')
+  	LOCAL_SPACE = False
+  	if LOCAL_SPACE:
+  		new_quat = mathutils.Quaternion((0, -1, 0), stick_val * 0.1)
+  		cam.rotation_quaternion = cam.rotation_quaternion @ new_quat
+  	else:
+  		new_quat = mathutils.Quaternion((0, 0, -1), stick_val * 0.1)
+  		cam.rotation_quaternion = new_quat @ cam.rotation_quaternion
 
   	return True
   #end
@@ -168,7 +175,13 @@ class BRCCommand_RSY(BRCCommand):
   	cam = context.scene.camera
   	# cam = context.selected_objects[0]
 
-  	print('TODO: Handle RSY')
+  	LOCAL_SPACE = True
+  	if LOCAL_SPACE:
+  		new_quat = mathutils.Quaternion((1, 0, 0), stick_val * 0.1)
+  		cam.rotation_quaternion = cam.rotation_quaternion @ new_quat
+  	else:
+  		new_quat = mathutils.Quaternion((1, 0, 0), stick_val * 0.1)
+  		cam.rotation_quaternion = new_quat @ cam.rotation_quaternion
 
   	return True
   #end
@@ -191,7 +204,7 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 	@classmethod
 	def poll(self, context):
 		# Scene camera.
-		return context.scene.camera is not None
+		return (context.scene.camera is not None) and (context.scene.camera.rotation_mode == 'QUATERNION')
 
 		# Must have a selected camera as the first object.
 		# sel = context.selected_objects
@@ -260,10 +273,16 @@ class DEV_PT_remote_camera(bpy.types.Panel):
 		layout = self.layout
 
 		layout.label(text='Select a Camera')
+
 		box = layout.box()
 		box.label(text='Server Settings')
 		box.prop(context.scene, 'brc_hostname', text='Host')
 		box.prop(context.scene, 'brc_port', text='Port')
+
+		box = layout.box()
+		box.label(text='Camera Settings')
+		box.prop(context.scene, 'brc_move_mod', text='Move Speed')
+
 		layout.operator(DEV_OT_remote_camera.bl_idname, text='Start Listening')
 	#end
 #end
@@ -279,6 +298,12 @@ def register():
 		default = 4242,
 		description = "Port"
 	)
+	bpy.types.Scene.brc_move_mod = bpy.props.FloatProperty(
+		name = "brc_move_mod",
+		default = 1.0,
+		description = "Camera movement modifier.",
+		min = 0.0
+	)
 
 	bpy.utils.register_class(DEV_OT_remote_camera)
 	bpy.utils.register_class(DEV_PT_remote_camera)
@@ -290,6 +315,7 @@ def unregister():
 
 	del bpy.types.Scene.brc_hostname
 	del bpy.types.Scene.brc_port
+	del bpy.types.Scene.brc_move_mod
 #end
 
 if __name__ == '__main__':
