@@ -13,9 +13,10 @@ bl_info = {
 import bpy
 import threading
 import socket
+from collections import deque
 
 class BRCSocketThread(threading.Thread):
-	data_str = None
+	command_deque = deque([], maxlen=20)
 	running = False
 	#
 	sock = None
@@ -65,29 +66,52 @@ class BRCSocketThread(threading.Thread):
 			try:
 				buff = self.sock.recvfrom(self.BUFF_SIZE)
 			except:
-				print(f'BRC: Socket timeout.')
-				self.data_str = ''
+				# print(f'BRC: Socket timeout.')
 				continue
 			data = buff[0]
 			addr = buff[1]
 
 			# Back from bytes to string.
-			self.data_str = str(data, 'utf-8')
-			# TODO: This method basically stores ('last known command received').
-			#       This is messy as the client (using the thread) doesn't know
-			#       about new messages other than the string changing. I could
-			#       add a callback here instead that is processed each time the
-			#       data changes, and hook up the callback in the DEV_OT_remote_camera below?
-			#
-			# Here's the new idea to handle the messages without taking up too much memory or handling
-			# complex states: I have a fixed-size queue (say, n=20) of incoming messages. When receiving a NEW message,
-			# this queue is appended from within this class. The DEV_OT_remote_camera timer tick can then
-			# pull the latest value from this queue. This is risky as if we don't read enough, new messages
-			# coming in could be missed as they are pushed out of the queue without being processed.
-			# Worth a shot anyway to see how well it works.
-			# https://code-maven.com/slides/python/fixed-size-dequeue
+			data_str = str(data, 'utf-8')
 
-			print(f'BRC received from {addr}: {data}')
+			# The expected format is "KEY:VALUE".
+			splits = data_str.split(':')
+			if len(splits) != 2:
+				print(f'BRC: Incorrect data received ({data_str}).')
+				continue
+			key = splits[0]
+			val = splits[1]
+
+			if 'LSX' == key: # LSX
+				try:
+					stick_val = float(val)
+					self.command_deque.append(('LSX', stick_val))
+				except ValueError:
+					print(f'BRC: Received LSX command but value was not a float ({val}).')
+					continue
+			elif 'LSY' == key: # LSY
+				try:
+					stick_val = float(val)
+					self.command_deque.append(('LSY', stick_val))
+				except ValueError:
+					print(f'BRC: Received LSY command but value was not a float ({val}).')
+					continue
+			elif 'RSX' == key: # RSX
+				try:
+					stick_val = float(val)
+					self.command_deque.append(('RSX', stick_val))
+				except ValueError:
+					print(f'BRC: Received RSX command but value was not a float ({val}).')
+					continue
+			elif 'RSY' == key: # RSY
+				try:
+					stick_val = float(val)
+					self.command_deque.append(('RSY', stick_val))
+				except ValueError:
+					print(f'BRC: Received RSY command but value was not a float ({val}).')
+					continue
+			else:
+				print(f'BRC: Received unknown command ({data_str}).')
 		#end
 
 		# Shutdown the socket.
@@ -133,7 +157,8 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 
 		# Respond to timer firing.
 		if 'TIMER' == event.type:
-			print(f'BRC Thread Data: {self.brc_thread.data_str}')
+			if len(self.brc_thread.command_deque):
+				print(f'BRC Thread Data: {self.brc_thread.command_deque.popleft()}')
 		#end
 
 		return {'PASS_THROUGH'}
