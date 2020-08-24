@@ -9,10 +9,13 @@ bl_info = {
 }
 
 import bpy
+import socket
 
 class DEV_OT_remote_camera(bpy.types.Operator):
 	bl_idname = 'dev.remote_camera'
 	bl_label = 'Blender Remote Camera'
+	BUFF_SIZE = 1024
+	sock = None
 
 	@classmethod
 	def poll(self, context):
@@ -22,9 +25,27 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 
 	# Test to print the props.
 	def execute(self, context):
-		print('Host: ' + context.scene.brc_hostname)
-		print('Port: ' + str(context.scene.brc_port))
-		return {'FINISHED'}
+		# Socket already valid?
+		if self.sock is not None:
+			print('BRC: Failed to create socket as it was already active.')
+			return {'FINISHED'}
+
+		# Create the socket.
+		try:
+			self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		except socket.error as err:
+			print(f'BRC: Failed to create socket. Error code: {err[0]}; Message: {err[1]}')
+			return {'FINISHED'}
+
+		# Bind the socket.
+		try:
+			self.sock.bind((context.scene.brc_hostname, context.scene.brc_port))
+			print(f'BRC: Socket bound at {context.scene.brc_hostname}:{context.scene.brc_port}')
+		except socket.error as err:
+			print(f'BRC: Failed to bind socket. Error code: {err[0]}; Message: {err[1]}')
+
+		
+		return {'RUNNING_MODAL'}
 
 	#TODO: modal for the actual socket read and camera movement
 #end
