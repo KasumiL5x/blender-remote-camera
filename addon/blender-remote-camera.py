@@ -78,6 +78,14 @@ class BRCSocketThread(threading.Thread):
 			#       about new messages other than the string changing. I could
 			#       add a callback here instead that is processed each time the
 			#       data changes, and hook up the callback in the DEV_OT_remote_camera below?
+			#
+			# Here's the new idea to handle the messages without taking up too much memory or handling
+			# complex states: I have a fixed-size queue (say, n=20) of incoming messages. When receiving a NEW message,
+			# this queue is appended from within this class. The DEV_OT_remote_camera timer tick can then
+			# pull the latest value from this queue. This is risky as if we don't read enough, new messages
+			# coming in could be missed as they are pushed out of the queue without being processed.
+			# Worth a shot anyway to see how well it works.
+			# https://code-maven.com/slides/python/fixed-size-dequeue
 
 			print(f'BRC received from {addr}: {data}')
 		#end
