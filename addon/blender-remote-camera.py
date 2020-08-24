@@ -76,37 +76,6 @@ class BRCSocketThread(threading.Thread):
 
 			# Add it to the queue.
 			self.command_deque.append(data_str)
-
-			# if 'LSX' == key: # LSX
-			# 	try:
-			# 		stick_val = float(val)
-			# 		self.command_deque.append(('LSX', stick_val))
-			# 	except ValueError:
-			# 		print(f'BRC: Received LSX command but value was not a float ({val}).')
-			# 		continue
-			# elif 'LSY' == key: # LSY
-			# 	try:
-			# 		stick_val = float(val)
-			# 		self.command_deque.append(('LSY', stick_val))
-			# 	except ValueError:
-			# 		print(f'BRC: Received LSY command but value was not a float ({val}).')
-			# 		continue
-			# elif 'RSX' == key: # RSX
-			# 	try:
-			# 		stick_val = float(val)
-			# 		self.command_deque.append(('RSX', stick_val))
-			# 	except ValueError:
-			# 		print(f'BRC: Received RSX command but value was not a float ({val}).')
-			# 		continue
-			# elif 'RSY' == key: # RSY
-			# 	try:
-			# 		stick_val = float(val)
-			# 		self.command_deque.append(('RSY', stick_val))
-			# 	except ValueError:
-			# 		print(f'BRC: Received RSY command but value was not a float ({val}).')
-			# 		continue
-			# else:
-			# 	print(f'BRC: Received unknown command ({data_str}).')
 		#end
 
 		# Shutdown the socket.
@@ -125,25 +94,83 @@ class BRCCommand(object):
 
 class BRCCommand_LSX(BRCCommand):
   def handle(self, context, command, value) -> bool:
-    return command == 'LSX'
+  	if command != 'LSX':
+  		return False
+
+  	try:
+  		stick_val = float(value)
+  	except ValueError:
+  		print(f'BRC: Handled LSX command but value was not a float ({value}).')
+  		return True
+
+  	# Verified from DEV_OT_remote_camera.poll().
+  	cam = context.scene.camera
+  	# cam = context.selected_objects[0]
+  	cam.location.x += stick_val
+
+  	return True
   #end
 #end
 
 class BRCCommand_LSY(BRCCommand):
   def handle(self, context, command, value) -> bool:
-    return command == 'LSY'
+  	if command != 'LSY':
+  		return False
+
+  	try:
+  		stick_val = float(value)
+  	except ValueError:
+  		print(f'BRC: Handled LSXY command but value was not a float ({value}).')
+  		return True
+
+  	# Verified from DEV_OT_remote_camera.poll().
+  	cam = context.scene.camera
+  	# cam = context.selected_objects[0]
+  	cam.location.z += -stick_val
+
+  	return True
   #end
 #end
 
 class BRCCommand_RSX(BRCCommand):
   def handle(self, context, command, value) -> bool:
-    return command == 'RSX'
+  	if command != 'RSX':
+  		return False
+
+  	try:
+  		stick_val = float(value)
+  	except ValueError:
+  		print(f'BRC: Handled RSX command but value was not a float ({value}).')
+  		return True
+
+  	# Verified from DEV_OT_remote_camera.poll().
+  	cam = context.scene.camera
+  	# cam = context.selected_objects[0]
+
+  	print('TODO: Handle RSX')
+
+  	return True
   #end
 #end
 
 class BRCCommand_RSY(BRCCommand):
   def handle(self, context, command, value) -> bool:
-    return command == 'RSY'
+  	if command != 'RSY':
+  		return False
+
+  	try:
+  		stick_val = float(value)
+  	except ValueError:
+  		print(f'BRC: Handled RSY command but value was not a float ({value}).')
+  		return True
+
+  	# Verified from DEV_OT_remote_camera.poll().
+  	cam = context.scene.camera
+  	# cam = context.selected_objects[0]
+
+  	print('TODO: Handle RSY')
+
+  	return True
   #end
 #end
 
@@ -163,9 +190,12 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 
 	@classmethod
 	def poll(self, context):
+		# Scene camera.
+		return context.scene.camera is not None
+
 		# Must have a selected camera as the first object.
-		sel = context.selected_objects
-		return len(sel) and 'CAMERA' == sel[0].type
+		# sel = context.selected_objects
+		# return len(sel) and 'CAMERA' == sel[0].type
 	#end
 
 	# Test to print the props.
@@ -205,7 +235,7 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 				for handler in self.handlers:
 					if handler.handle(context, key, val):
 						command_handled = True
-						print(f'EVENT HANDLED BY: {handler}')
+						# print(f'EVENT HANDLED BY: {handler}')
 						break
 				#end
 
