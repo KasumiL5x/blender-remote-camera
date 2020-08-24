@@ -1,3 +1,5 @@
+# Thread class structure inspired by http://merwanachibet.net/blog/blender-long-running-python-scripts/
+
 bl_info = {
 	"name": "Blender Remote Camera",
 	"author": "Daniel Green (KasumiL5x)",
@@ -9,45 +11,125 @@ bl_info = {
 }
 
 import bpy
+import threading
 import socket
+
+class BRCSocketThread(threading.Thread):
+	data_str = None
+	running = False
+	#
+	sock = None
+	host = 'localhost'
+	port = 4242
+	BUFF_SIZE = 1024
+
+	def __init__(self, host, port):
+		threading.Thread.__init__(self)
+		self.host = host
+		self.port = port
+	#end
+
+	def start(self):
+		print('BRC: Starting socket thread.')
+		self.running = True
+		threading.Thread.start(self)
+	#end
+
+	def stop(self):
+		print('BRC: Stopping socket thread.')
+		self.running = False
+	#end
+
+	def run(self):
+		# Create the socket.
+		try:
+			self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+			self.sock.settimeout(3)
+			# server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) ???
+			# https://stackoverflow.com/questions/44387712/python-sockets-how-to-shut-down-the-server
+		except socket.error as err:
+			print(f'BRC: Failed to create socket. Message: {err}')
+			return
+
+		# Bind the socket.
+		try:
+			self.sock.bind((self.host, self.port))
+			print(f'BRC: Socket bound at {self.host}:{self.port}')
+		except socket.error as err:
+			print(f'BRC: Failed to bind socket. Message: {err}')
+			return
+
+
+		while self.running:
+			# Receive from client.
+			try:
+				buff = self.sock.recvfrom(self.BUFF_SIZE)
+			except:
+				print(f'BRC: Socket timeout.')
+				self.data_str = ''
+				continue
+			data = buff[0]
+			addr = buff[1]
+
+			# Back from bytes to string.
+			self.data_str = str(data, 'utf-8')
+			# TODO: This method basically stores ('last known command received').
+			#       This is messy as the client (using the thread) doesn't know
+			#       about new messages other than the string changing. I could
+			#       add a callback here instead that is processed each time the
+			#       data changes, and hook up the callback in the DEV_OT_remote_camera below?
+
+			print(f'BRC received from {addr}: {data}')
+		#end
+
+		# Shutdown the socket.
+		print('BRC: shutting down socket.')
+		self.sock.close()
+
+		print('BRC: Socket running loop ended.')
+	#end
+#end
 
 class DEV_OT_remote_camera(bpy.types.Operator):
 	bl_idname = 'dev.remote_camera'
 	bl_label = 'Blender Remote Camera'
-	BUFF_SIZE = 1024
-	sock = None
+	#
+	brc_thread = None
+	brc_timer = None
 
 	@classmethod
 	def poll(self, context):
 		# Must have a selected camera as the first object.
 		sel = context.selected_objects
 		return len(sel) and 'CAMERA' == sel[0].type
+	#end
 
 	# Test to print the props.
 	def execute(self, context):
-		# Socket already valid?
-		if self.sock is not None:
-			print('BRC: Failed to create socket as it was already active.')
-			return {'FINISHED'}
+		# Start the socket thread.
+		self.brc_thread = BRCSocketThread(context.scene.brc_hostname, context.scene.brc_port)
+		self.brc_thread.start()
 
-		# Create the socket.
-		try:
-			self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		except socket.error as err:
-			print(f'BRC: Failed to create socket. Error code: {err[0]}; Message: {err[1]}')
-			return {'FINISHED'}
-
-		# Bind the socket.
-		try:
-			self.sock.bind((context.scene.brc_hostname, context.scene.brc_port))
-			print(f'BRC: Socket bound at {context.scene.brc_hostname}:{context.scene.brc_port}')
-		except socket.error as err:
-			print(f'BRC: Failed to bind socket. Error code: {err[0]}; Message: {err[1]}')
-
-		
+		self.brc_timer = context.window_manager.event_timer_add(0.05, window=context.window)
+		context.window_manager.modal_handler_add(self)
 		return {'RUNNING_MODAL'}
+	#end
 
-	#TODO: modal for the actual socket read and camera movement
+	def modal(self, context, event):
+		# Stop when ESC is pressed.
+		if 'ESC' == event.type:
+			self.brc_thread.stop()
+			context.window_manager.event_timer_remove(self.brc_timer)
+			return {'CANCELLED'}
+		#end
+
+		# Respond to timer firing.
+		if 'TIMER' == event.type:
+			print(f'BRC Thread Data: {self.brc_thread.data_str}')
+		#end
+
+		return {'PASS_THROUGH'}
+	#end
 #end
 
 class DEV_PT_remote_camera(bpy.types.Panel):
@@ -84,6 +166,7 @@ def register():
 
 	bpy.utils.register_class(DEV_OT_remote_camera)
 	bpy.utils.register_class(DEV_PT_remote_camera)
+#end
 
 def unregister():
 	bpy.utils.unregister_class(DEV_OT_remote_camera)
@@ -91,6 +174,7 @@ def unregister():
 
 	del bpy.types.Scene.brc_hostname
 	del bpy.types.Scene.brc_port
+#end
 
 if __name__ == '__main__':
 	register()
