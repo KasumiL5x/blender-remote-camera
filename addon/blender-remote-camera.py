@@ -301,13 +301,13 @@ def register():
 	)
 	bpy.types.Scene.brc_move_mod = bpy.props.FloatProperty(
 		name = "brc_move_mod",
-		default = 1.0,
+		default = 0.1,
 		description = "Camera movement modifier.",
 		min = 0.0
 	)
 	bpy.types.Scene.brc_orient_mod = bpy.props.FloatProperty(
 		name = "brc_orient_mod",
-		default = 1.0,
+		default = 0.1,
 		description = "Camera orientation modifier.",
 		min = 0.0
 	)
