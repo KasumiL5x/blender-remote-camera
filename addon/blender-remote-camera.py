@@ -150,10 +150,10 @@ class BRCCommand_RSX(BRCCommand):
 
   	LOCAL_SPACE = False
   	if LOCAL_SPACE:
-  		new_quat = mathutils.Quaternion((0, -1, 0), stick_val * 0.1)
+  		new_quat = mathutils.Quaternion((0, -1, 0), stick_val * context.scene.brc_orient_mod)
   		cam.rotation_quaternion = cam.rotation_quaternion @ new_quat
   	else:
-  		new_quat = mathutils.Quaternion((0, 0, -1), stick_val * 0.1)
+  		new_quat = mathutils.Quaternion((0, 0, -1), stick_val * context.scene.brc_orient_mod)
   		cam.rotation_quaternion = new_quat @ cam.rotation_quaternion
 
   	return True
@@ -282,6 +282,7 @@ class DEV_PT_remote_camera(bpy.types.Panel):
 		box = layout.box()
 		box.label(text='Camera Settings')
 		box.prop(context.scene, 'brc_move_mod', text='Move Speed')
+		box.prop(context.scene, 'brc_orient_mod', text='Orient Speed')
 
 		layout.operator(DEV_OT_remote_camera.bl_idname, text='Start Listening')
 	#end
@@ -304,6 +305,12 @@ def register():
 		description = "Camera movement modifier.",
 		min = 0.0
 	)
+	bpy.types.Scene.brc_orient_mod = bpy.props.FloatProperty(
+		name = "brc_orient_mod",
+		default = 1.0,
+		description = "Camera orientation modifier.",
+		min = 0.0
+	)
 
 	bpy.utils.register_class(DEV_OT_remote_camera)
 	bpy.utils.register_class(DEV_PT_remote_camera)
@@ -316,6 +323,7 @@ def unregister():
 	del bpy.types.Scene.brc_hostname
 	del bpy.types.Scene.brc_port
 	del bpy.types.Scene.brc_move_mod
+	del bpy.types.Scene.brc_orient_mod
 #end
 
 if __name__ == '__main__':
