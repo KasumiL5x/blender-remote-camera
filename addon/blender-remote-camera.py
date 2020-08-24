@@ -74,44 +74,39 @@ class BRCSocketThread(threading.Thread):
 			# Back from bytes to string.
 			data_str = str(data, 'utf-8')
 
-			# The expected format is "KEY:VALUE".
-			splits = data_str.split(':')
-			if len(splits) != 2:
-				print(f'BRC: Incorrect data received ({data_str}).')
-				continue
-			key = splits[0]
-			val = splits[1]
+			# Add it to the queue.
+			self.command_deque.append(data_str)
 
-			if 'LSX' == key: # LSX
-				try:
-					stick_val = float(val)
-					self.command_deque.append(('LSX', stick_val))
-				except ValueError:
-					print(f'BRC: Received LSX command but value was not a float ({val}).')
-					continue
-			elif 'LSY' == key: # LSY
-				try:
-					stick_val = float(val)
-					self.command_deque.append(('LSY', stick_val))
-				except ValueError:
-					print(f'BRC: Received LSY command but value was not a float ({val}).')
-					continue
-			elif 'RSX' == key: # RSX
-				try:
-					stick_val = float(val)
-					self.command_deque.append(('RSX', stick_val))
-				except ValueError:
-					print(f'BRC: Received RSX command but value was not a float ({val}).')
-					continue
-			elif 'RSY' == key: # RSY
-				try:
-					stick_val = float(val)
-					self.command_deque.append(('RSY', stick_val))
-				except ValueError:
-					print(f'BRC: Received RSY command but value was not a float ({val}).')
-					continue
-			else:
-				print(f'BRC: Received unknown command ({data_str}).')
+			# if 'LSX' == key: # LSX
+			# 	try:
+			# 		stick_val = float(val)
+			# 		self.command_deque.append(('LSX', stick_val))
+			# 	except ValueError:
+			# 		print(f'BRC: Received LSX command but value was not a float ({val}).')
+			# 		continue
+			# elif 'LSY' == key: # LSY
+			# 	try:
+			# 		stick_val = float(val)
+			# 		self.command_deque.append(('LSY', stick_val))
+			# 	except ValueError:
+			# 		print(f'BRC: Received LSY command but value was not a float ({val}).')
+			# 		continue
+			# elif 'RSX' == key: # RSX
+			# 	try:
+			# 		stick_val = float(val)
+			# 		self.command_deque.append(('RSX', stick_val))
+			# 	except ValueError:
+			# 		print(f'BRC: Received RSX command but value was not a float ({val}).')
+			# 		continue
+			# elif 'RSY' == key: # RSY
+			# 	try:
+			# 		stick_val = float(val)
+			# 		self.command_deque.append(('RSY', stick_val))
+			# 	except ValueError:
+			# 		print(f'BRC: Received RSY command but value was not a float ({val}).')
+			# 		continue
+			# else:
+			# 	print(f'BRC: Received unknown command ({data_str}).')
 		#end
 
 		# Shutdown the socket.
@@ -122,12 +117,49 @@ class BRCSocketThread(threading.Thread):
 	#end
 #end
 
+class BRCCommand(object):
+  def handle(self, context, command, value) -> bool:
+    return False
+  #end
+#end
+
+class BRCCommand_LSX(BRCCommand):
+  def handle(self, context, command, value) -> bool:
+    return command == 'LSX'
+  #end
+#end
+
+class BRCCommand_LSY(BRCCommand):
+  def handle(self, context, command, value) -> bool:
+    return command == 'LSY'
+  #end
+#end
+
+class BRCCommand_RSX(BRCCommand):
+  def handle(self, context, command, value) -> bool:
+    return command == 'RSX'
+  #end
+#end
+
+class BRCCommand_RSY(BRCCommand):
+  def handle(self, context, command, value) -> bool:
+    return command == 'RSY'
+  #end
+#end
+
 class DEV_OT_remote_camera(bpy.types.Operator):
 	bl_idname = 'dev.remote_camera'
 	bl_label = 'Blender Remote Camera'
 	#
 	brc_thread = None
 	brc_timer = None
+	#
+	handlers = [
+		BRCCommand_LSX(),
+		BRCCommand_LSY(),
+		BRCCommand_RSX(),
+		BRCCommand_RSY()
+	]
 
 	@classmethod
 	def poll(self, context):
@@ -158,7 +190,28 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 		# Respond to timer firing.
 		if 'TIMER' == event.type:
 			if len(self.brc_thread.command_deque):
-				print(f'BRC Thread Data: {self.brc_thread.command_deque.popleft()}')
+				data = self.brc_thread.command_deque.popleft()
+				
+				# Split the data.
+				splits = data.split(':')
+				if len(splits) != 2:
+					print(f'BRC: Incorrect data received ({data}).')
+					return {'PASS_THROUGH'} # Graceful error handling.
+				key = splits[0]
+				val = splits[1]
+
+				# Handle the data.
+				command_handled = False
+				for handler in self.handlers:
+					if handler.handle(context, key, val):
+						command_handled = True
+						print(f'EVENT HANDLED BY: {handler}')
+						break
+				#end
+
+				if not command_handled:
+					print(f'BRC: Failed to handle command ({data}).')
+			#end
 		#end
 
 		return {'PASS_THROUGH'}
