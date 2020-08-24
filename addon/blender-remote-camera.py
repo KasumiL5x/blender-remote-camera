@@ -14,6 +14,12 @@ class DEV_OT_remote_camera(bpy.types.Operator):
 	bl_idname = 'dev.remote_camera'
 	bl_label = 'Blender Remote Camera'
 
+	@classmethod
+	def poll(self, context):
+		# Must have a selected camera as the first object.
+		sel = context.selected_objects
+		return len(sel) and 'CAMERA' == sel[0].type
+
 	# Test to print the props.
 	def execute(self, context):
 		print('Host: ' + context.scene.brc_hostname)
@@ -34,6 +40,7 @@ class DEV_PT_remote_camera(bpy.types.Panel):
 	def draw(self, context):
 		layout = self.layout
 
+		layout.label(text='Select a Camera')
 		box = layout.box()
 		box.label(text='Server Settings')
 		box.prop(context.scene, 'brc_hostname', text='Host')
